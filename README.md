@@ -21,7 +21,7 @@ $components => array(
 ```
 if logType is set to `error` only errors will be saved, if `success` only successful requests, if you want to save both set it as `both`.
 
-with this, be sure to create log file in `app/tmp/logs` direcoty with name `stripe.log`, and also add this in your bootstrap.php
+with this, be sure to create log file in `app/tmp/logs` directory with name `stripe.log`, and also add this in your bootstrap.php
 
 ```
 CakeLog::config('stripe', array(
@@ -44,8 +44,25 @@ Configure::write('Stripe.currency', 'usd');
 
 ## Usage
 Each function returns array - containing 'status', 'message' and 'data' keys
-if response was successful, keys will be  'success', 'Success' and the stripe response(as described in API docs), but as an associative array respectively,
-if request failed, keys will be 'error', the card error message if it was card_error, boolen false otherwise, and error data as an array respectively
+if response was successful, keys will be  
+
+```
+'status' => 'success',
+'message' => 'Success',
+'data' => the Stripe's response described in API docs, but as an associative array
+```
+
+if request failed, response will be
+
+```
+'status' => 'error',
+'message' => the Stripe error message, if it was card error, boolen false otherwise
+'data' => Stripe's error response
+```
+
+Here are a few examples and the list of functions
+
+
 
 List of functions
 
