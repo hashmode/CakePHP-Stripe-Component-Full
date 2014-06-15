@@ -44,6 +44,8 @@ Configure::write('Stripe.currency', 'usd');
 
 ## Usage
 Each function returns array - containing `status`, `message` and `data` keys
+
+
 if response was successful, keys will be  
 
 ```
