@@ -62,8 +62,7 @@ if request failed, response will be
 'data' => Stripe's error response
 ```
 
-Here are a few examples and the list of functions
-
+Function parameters based on API docs, for example if it is necessary to create card, we need to `customer_id` and card data, either as array or as token, https://stripe.com/docs/api#create_card, so using `createCard($customerId = null, $card = null)` function, we should provide customer's as first parameter `$customerId` and card data as second parameter `$card`.
 
 
 List of functions
