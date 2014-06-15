@@ -5,7 +5,7 @@ Cakephp component for stripe payments - contains all the methods described in St
 
 ## Installation
 
-1) Copy `StripeComponent.php` file to app/Controller/Component directory.
+1) Copy `StripeComponent.php` file to `app/Controller/Component` directory.
 
 2) Download Stripe PHP library from https://stripe.com/docs/libraries and unpack it in Vendor folder, so the Stripe.php file will have the following path `app/Vendor/stripe/lib/Stripe.php`
 
