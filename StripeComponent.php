@@ -2013,7 +2013,6 @@ class StripeComponent extends Component {
 
 					$success = $this->fetch($card);
 					
-					debug($success);die;
 					break;
 				case 'updateCard':	
 					$cu = Stripe_Customer::retrieve($data['customer_id']);
@@ -2341,7 +2340,6 @@ class StripeComponent extends Component {
 					$tr = Stripe_Transfer::all($data['options']);
 					$success = $this->fetch($tr);
 
-					$start = microtime(true);
 					foreach ($success['data'] as &$transfer) {
 						$transfer = $this->fetch($transfer);
 						
@@ -2386,9 +2384,6 @@ class StripeComponent extends Component {
 						}
 					}
 					
-					echo microtime(true) - $start;
-					die;
-						
 					break;
 							
 					
