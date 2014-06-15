@@ -5,7 +5,7 @@
  * PHP 5
  * 
  * Licensed under The MIT License
- * 
+ * associative
  * @version		1.0
  * @author		http://hashmode.com
  * @license		MIT License (http://www.opensource.org/licenses/mit-license.php)
@@ -1806,7 +1806,7 @@ class StripeComponent extends Component {
  * @param array $data
  *  	
  * @return array - containing 'status', 'message' and 'data' keys
- * 					if response was successful, keys will be 'success', 'Success' and the stripe response as associated array respectively,
+ * 					if response was successful, keys will be 'success', 'Success' and the stripe response as associative array respectively,
  *   				if request failed, keys will be 'error', the card error message if it was card_error, boolen false otherwise, and 
  *   								error data as an array respectively
  */	
