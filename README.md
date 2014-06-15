@@ -19,7 +19,7 @@ $components => array(
     )
 );
 ```
-if logType is set to `error` only errors will be saved, if `success` only successful requests, if you want to save both set it as `both`.
+if `logType` is set to `error` only errors will be saved, if `success` only successful requests, if you want to save both set it as `both`.
 
 with this, be sure to create log file in `app/tmp/logs` directory with name `stripe.log`, and also add this in your bootstrap.php
 
@@ -43,7 +43,7 @@ Configure::write('Stripe.currency', 'usd');
 
 
 ## Usage
-Each function returns array - containing 'status', 'message' and 'data' keys
+Each function returns array - containing `status`, `message` and `data` keys
 if response was successful, keys will be  
 
 ```
