@@ -1,7 +1,7 @@
 CakePHP-Stripe-Component-Full
 =============================
 
-Cakephp component for stripe payments - contains all the methods described in Stripe PHP API. Cake version 2x. Was created with Stripe API version 1.15.0(latest at the moment).
+Cakephp component for stripe payments - contains all the methods described in Stripe API. Cake version 2x. Was created with Stripe API version 1.15.0(latest at the moment).
 
 ## Installation
 
