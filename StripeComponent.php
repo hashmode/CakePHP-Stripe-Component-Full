@@ -2606,16 +2606,20 @@ class StripeComponent extends Component {
 			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
 		} catch (Stripe_AuthenticationError $e) {
-			$error = $e->getJsonBody();
+			$body = $e->getJsonBody();
+			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
 		} catch (Stripe_ApiConnectionError $e) {
 			$body = $e->getJsonBody();
+			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
 		} catch (Stripe_Error $e) {
 			$body = $e->getJsonBody();
+			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
 		} catch (Exception $e) {
 			$body = $e->getJsonBody();
+			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
 		}
 		
