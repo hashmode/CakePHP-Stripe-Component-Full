@@ -9,7 +9,7 @@
  * @version		1.0
  * @author		http://hashmode.com
  * @license		MIT License (http://www.opensource.org/licenses/mit-license.php)
- * @link		  https://github.com/hashmode/CakePHP-Stripe-Component-Full
+ * @link		https://github.com/hashmode/CakePHP-Stripe-Component-Full
  * 
  * Compatible with Stripe API version 1.15.0
  * 
