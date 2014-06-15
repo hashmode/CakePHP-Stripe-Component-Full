@@ -62,7 +62,7 @@ if request failed, response will be
 'data' => Stripe's error response
 ```
 
-Function parameters are almsot identical what what is said in API docs, for example if it is necessary to create card, we need customer's id and the card data, either as array or as token (https://stripe.com/docs/api#create_card), so using `createCard($customerId = null, $card = null)` function, we should provide customer's id as first parameter `$customerId` and card data as second parameter `$card`.
+Function parameters are almost identical what is said in API docs, for example if it is necessary to create card, we need customer's id and the card data, either as array or as token (https://stripe.com/docs/api#create_card), so using `createCard($customerId = null, $card = null)` function, we should provide customer's id as first parameter `$customerId` and card data as second parameter `$card`.
 
 
 List of functions
