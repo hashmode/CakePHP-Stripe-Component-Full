@@ -82,7 +82,7 @@ class StripeComponent extends Component {
  *
  * @var array
  */
-	public $reflectionClass = array();
+	protected $reflectionClass = array();
 	
 	
 
