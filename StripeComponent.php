@@ -413,7 +413,7 @@ class StripeComponent extends Component {
  * listCustomers method
  * Returns array with customers
  * 
- * As this is an expensive call(Reflection class is used to convert objects to arrays) use limit wisely
+ * This is an expensive call(Reflection class is used to convert objects to arrays) use limit to get only the items you need
  *
  * @param array $data
  * @param array $cards - default is false, if true each customers cards will be returned as array
