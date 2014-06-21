@@ -1801,7 +1801,7 @@ class StripeComponent extends Component {
  * @param string $method
  * @param array $data
  *  	
- * @return array - containing 'status', 'message' and 'data' keys
+ * @return array - containing 'status', 'message' and 'response' keys
  * 					if response was successful, keys will be 'success', 'Success' and the stripe response as associative array respectively,
  *   				if request failed, keys will be 'error', the card error message if it was card_error, boolen false otherwise, and 
  *   								error data as an array respectively
@@ -2627,7 +2627,7 @@ class StripeComponent extends Component {
 			return array(
 				'status' => 'success',
 				'message' => 'Success',
-				'data' => $success	
+				'response' => $success	
 			);
 		}
 
@@ -2639,7 +2639,7 @@ class StripeComponent extends Component {
 		return array(
 			'status' => 'error',
 			'message' => $message,
-			'data' => $error	
+			'response' => $error	
 		);
 	}
 	
