@@ -43,7 +43,7 @@ Configure::write('Stripe.currency', 'usd');
 
 
 ## Usage
-Each function returns array - containing `status`, `message` and `data` keys
+Each function returns array - containing `status`, `message` and `response` keys
 
 
 if response was successful, keys will be  
@@ -51,7 +51,7 @@ if response was successful, keys will be
 ```
 'status' => 'success',
 'message' => 'Success',
-'data' => the Stripe's response described in API docs, but as an associative array
+'response' => the Stripe's response described in API docs, but as an associative array
 ```
 
 if request failed, response will be
@@ -59,7 +59,7 @@ if request failed, response will be
 ```
 'status' => 'error',
 'message' => the Stripe error message, if it was card error, boolen false otherwise
-'data' => Stripe's error response
+'response' => Stripe's error response
 ```
 
 Function parameters are almost identical what is said in API docs, for example if it is necessary to create card, we need customer's id and the card data, either as an array or as a token (https://stripe.com/docs/api#create_card), so using `createCard($customerId = null, $card = null)` function, we should provide customer's id as first parameter `$customerId` and card data as second parameter `$card`.
