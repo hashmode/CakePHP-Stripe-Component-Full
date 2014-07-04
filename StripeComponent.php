@@ -179,7 +179,7 @@ class StripeComponent extends Component {
 		}
 
 		if ($customerId) {
-			$data['customer_id'] = $customerId;
+			$data['customer'] = $customerId;
 		}
 		
 		// set default currency
