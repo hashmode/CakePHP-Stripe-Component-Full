@@ -161,7 +161,7 @@ class StripeComponent extends Component {
 
 /**
  * charge method
- * Charges the given credit card(array or token) or customer
+ * Charges the given credit card(card_id, array or token) or customer
  *
  * @param array $data
  * @param string $customerId[optional] 
@@ -174,10 +174,6 @@ class StripeComponent extends Component {
 			throw new CakeException(__('Customer Id or Card is required'));
 		}
 		
-		if ($customerId && isset($data['card']) && $data['card']) {
-			throw new CakeException(__('Only Customer Id or Card should be provided'));
-		}
-
 		if ($customerId) {
 			$data['customer'] = $customerId;
 		}
