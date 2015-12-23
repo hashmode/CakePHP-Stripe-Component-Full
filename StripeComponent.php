@@ -1,17 +1,28 @@
 <?php 
+spl_autoload_register(function ($class) {
+	foreach (App::path('Vendor') as $base) {
+		$path = $base . 'lib' . str_replace('Stripe\\', DS, $class) . '.php';
+		// for nested classes
+		$path = str_replace('\\', DS, $path);
+		if (file_exists($path)) {
+			include $path;
+			return;
+		}
+	}
+});
 /**
  * Stripe Component
  * 
  * PHP 5
  * 
  * Licensed under The MIT License
- * associative
- * @version		1.0
+ * 
+ * @version		2.0
  * @author		http://hashmode.com
  * @license		MIT License (http://www.opensource.org/licenses/mit-license.php)
  * @link		https://github.com/hashmode/CakePHP-Stripe-Component-Full
  * 
- * Compatible with Stripe API version 1.15.0
+ * Compatible with Stripe API version 3.4.0
  * 
  * ***** IMPORTANT ******
  * Stripe PHP library is not included, it should be downloaded from Stripe's website
@@ -28,8 +39,7 @@ App::uses('Component', 'Controller');
  *	
  */
 class StripeComponent extends Component {
-	
-	
+
 /**
  * Stripe mode, can be 'Live' or 'Test' 
  *
@@ -80,7 +90,7 @@ class StripeComponent extends Component {
 /**
  *  For saving the reflection class, to use in the loop
  *
- * @var array
+ * @protected array
  */
 	protected $reflectionClass = array();
 	
@@ -96,18 +106,12 @@ class StripeComponent extends Component {
 
 	public function initialize(Controller $controller) {
 		$this->Controller = $controller;
-		
-		App::import ( 'Vendor', 'stripe', 
-			array(
-				'file' => 'stripe'.DS.'lib'.DS.'Stripe.php' 
-			)
-		);
-		
-		if (!class_exists('Stripe')) {
+
+		if (!class_exists('Stripe\Stripe')) {
 			throw new CakeException('Stripe PHP Library not found. Be sure it is unpacked in app/Vendor/stripe directory.
 									It can be downloaded from https://stripe.com/docs/libraries');
 		}
-
+		
 		// if mode is not set in bootstrap, defaults to 'Test' 
 		$mode = Configure::read('Stripe.mode');
 		if ($mode) {
@@ -154,14 +158,22 @@ class StripeComponent extends Component {
 	
 	
 	
+	public function getCents($price) {
+		return $price*100;
+	}
 	
+	public function getUsd($price, $currency = false) {
+		return number_format($price/100, 2).($currency ? ' '.strtoupper($this->currency) : '');
+	}
 	
-	
+	public function setApiKey() {
+		Stripe\Stripe::setApiKey($this->key);
+	}
 	
 
 /**
  * charge method
- * Charges the given credit card(card_id, array or token) or customer
+ * Charges the given credit card(card id, array or token) or customer
  *
  * @param array $data
  * @param string $customerId[optional] 
@@ -170,10 +182,10 @@ class StripeComponent extends Component {
  * @link https://stripe.com/docs/api#create_charge
  */
 	public function charge($data = null, $customerId = null) {
-		if (!$customerId && (!isset($data['card']) || empty($data['card'])) ) {
+		if (!$customerId && empty($data['card']) && empty($data['source'])) {
 			throw new CakeException(__('Customer Id or Card is required'));
 		}
-		
+
 		if ($customerId) {
 			$data['customer'] = $customerId;
 		}
@@ -185,7 +197,7 @@ class StripeComponent extends Component {
 		
 		return $this->request(__FUNCTION__, $data);
 	}
-	
+
 /**
  * retrieveCharge method
  * Retrieves the details of a charge that has previously been created
@@ -222,7 +234,7 @@ class StripeComponent extends Component {
 		if (!$chargeId) {
 			throw new CakeException(__('Charge Id is not provided'));
 		}
-	
+
 		if (empty($data)) {
 			throw new CakeException(__('No data is provided to updates the card'));
 		}
@@ -408,7 +420,9 @@ class StripeComponent extends Component {
 /**
  * listCustomers method
  * Returns array with customers
- *  *
+ * 
+ * As this is an expensive call(Reflection class is used to convert objects to arrays) use limit wisely
+ *
  * @param array $data
  * @param array $cards - default is false, if true each customers cards will be returned as array
  * @param array $subscriptions - default is false, if true each customers subscriptions will be returned as array
@@ -445,10 +459,21 @@ class StripeComponent extends Component {
 			throw new CakeException(__('Card data is not provided'));
 		}
 		
+		$metadata = array();
+		if (!empty($card['metadata'])) {
+			$metadata = $card['metadata'];
+			unset($card['metadata']);
+		}
+		
+		$card['object'] = 'card';
 		$data = array(
 			'customer_id' => $customerId,
-			'card' => $card
+			'source' => $card
 		);
+		
+		if (!empty($metadata)) {
+			$data['metadata'] = $metadata;
+		}
 
 		return $this->request(__FUNCTION__, $data);
 	}
@@ -576,7 +601,7 @@ class StripeComponent extends Component {
  * createSubscription method
  * Creates a new subscription for the given customer
  * 
- * @param string $customerId
+ * @param int $customerId
  * @param array $data - subscription data, token or array 
  * @return array
  * 
@@ -669,7 +694,7 @@ class StripeComponent extends Component {
  * 
  * @link https://stripe.com/docs/api/php#cancel_subscription
  */
-	public function cancelSubscription($customerId = null, $subscriptionId = null) {
+	public function cancelSubscription($customerId = null, $subscriptionId = null, $atPeriodEnd = false) {
 		if (!$customerId) {
 			throw new CakeException(__('Customer Id is not provided'));
 		}
@@ -679,6 +704,7 @@ class StripeComponent extends Component {
 		}
 		
 		$data = array(
+			'at_period_end' => $atPeriodEnd,
 			'customer_id' => $customerId,
 			'subscription_id' => $subscriptionId
 		);
@@ -1580,6 +1606,8 @@ class StripeComponent extends Component {
  * listRecipients method
  * Returns array with recipients
  *
+ * This is an expensive call(Reflection class is used to convert objects to arrays) use limit to get only the items you need
+ *
  * @param array $data
  * @return array
  *
@@ -1797,8 +1825,8 @@ class StripeComponent extends Component {
  * @param string $method
  * @param array $data
  *  	
- * @return array - containing 'status', 'message' and 'response' keys
- * 					if response was successful, keys will be 'success', 'Success' and the stripe response as associative array respectively,
+ * @return array - containing 'status', 'message' and 'data' keys
+ * 					if response was successful, keys will be 'success', 'Success' and the stripe response as associated array respectively,
  *   				if request failed, keys will be 'error', the card error message if it was card_error, boolen false otherwise, and 
  *   								error data as an array respectively
  */	
@@ -1810,7 +1838,7 @@ class StripeComponent extends Component {
 			throw new CakeException(__('Request Data is not provided'));
 		}
 		
-		Stripe::setApiKey($this->key);
+		Stripe\Stripe::setApiKey($this->key);
 		
 		$success = null;
 		$error = null;
@@ -1827,10 +1855,10 @@ class StripeComponent extends Component {
 			 *  
 			 */
 			case 'charge':
-				$success = $this->fetch(Stripe_Charge::create($data));
+				$success = $this->fetch(Stripe\Charge::create($data));
 				break;
 			case 'retrieveCharge':
-				$success = $this->fetch(Stripe_Charge::retrieve($data['charge_id']));
+				$success = $this->fetch(Stripe\Charge::retrieve($data['charge_id']));
 				
 				if (!empty($success['refunds'])) {
 					foreach ($success['refunds'] as &$refund) {
@@ -1840,7 +1868,7 @@ class StripeComponent extends Component {
 
 				break;
 			case 'updateCharge':
-				$charge = Stripe_Charge::retrieve($data['charge_id']);
+				$charge = Stripe\Charge::retrieve($data['charge_id']);
 			
 				foreach ($data['fields'] as $field => $value) {
 					$charge->$field = $value;
@@ -1849,34 +1877,38 @@ class StripeComponent extends Component {
 				$success = $this->fetch($charge->save());
 				break;
 			case 'refundCharge':
-				$charge = Stripe_Charge::retrieve($data['charge_id']);
+				$charge = Stripe\Charge::retrieve($data['charge_id']);
 				
+				// to prevent unknown param error
 				unset($data['charge_id']);
 				$success = $this->fetch($charge->refund($data));
-
-				foreach ($success['refunds'] as &$refund) {
+				
+				foreach ($success['refunds']['data'] as &$refund) {
 					$refund = $this->fetch($refund);
 				}
 				break;
 			case 'captureCharge':
-				$charge = Stripe_Charge::retrieve($data['charge_id']);
+				$charge = Stripe\Charge::retrieve($data['charge_id']);
 				
 				unset($data['charge_id']);
 				$success = $this->fetch($charge->capture($data));
 
-				foreach ($success['refunds'] as &$refund) {
-					$refund = $this->fetch($refund);
+				if (!empty($success['refunds']['data'])) {
+					foreach ($success['refunds']['data'] as &$refund) {
+						$refund = $this->fetch($refund);
+					}
 				}
+
 				break;
 			case 'listCharges':
-				$charges = Stripe_Charge::all();
+				$charges = Stripe\Charge::all();
 				$success = $this->fetch($charges);
 			
 				foreach ($success['data'] as &$charge) {
 					$charge = $this->fetch($charge);
 					
-					if (isset($charge['refunds']) && !empty($charge['refunds'])) {
-						foreach ($charge['refunds'] as &$refund) {
+					if (isset($charge['refunds']['data']) && !empty($charge['refunds']['data'])) {
+						foreach ($charge['refunds']['data'] as &$refund) {
 							$refund = $this->fetch($refund);
 						}
 						unset($refund);
@@ -1895,7 +1927,7 @@ class StripeComponent extends Component {
 				 * 		CUSTOMERS
 				 */
 				case 'createCustomer':
-					$customer = Stripe_Customer::create($data);
+					$customer = Stripe\Customer::create($data);
 					$success = $this->fetch($customer);
 					
 					if (!empty($success['cards']['data'])) {
@@ -1914,7 +1946,7 @@ class StripeComponent extends Component {
 					
 					break;
 				case 'retrieveCustomer':
-					$customer = Stripe_Customer::retrieve($data['customer_id']);
+					$customer = Stripe\Customer::retrieve($data['customer_id']);
 					$success = $this->fetch($customer);
 					
 					if (!empty($success['cards']['data'])) {
@@ -1933,7 +1965,7 @@ class StripeComponent extends Component {
 
 					break;
 				case 'updateCustomer':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
 					
 					foreach ($data['fields'] as $field => $value) {
 						$cu->$field = $value;
@@ -1957,12 +1989,12 @@ class StripeComponent extends Component {
 					
 					break;
 				case 'deleteCustomer':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
 					$success = $this->fetch($cu->delete());
 					
 					break;
 				case 'listCustomers':
-					$customers = Stripe_Customer::all($data['options']);
+					$customers = Stripe\Customer::all($data['options']);
 					$success = $this->fetch($customers);
 					
 					foreach ($success['data'] as &$customer) {
@@ -1991,24 +2023,45 @@ class StripeComponent extends Component {
 				 *  	
 				 */	
 				case 'createCard':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
 
-					// unset customer_id to prevent unknown parameter stripe error
+					$validCardFields = array(
+						'object',
+						'address_zip',
+						'address_city',
+						'address_state',
+						'address_country',
+						'address_line1',
+						'address_line2',
+						'number',
+						'exp_month',
+						'exp_year',
+						'cvc',
+						'name',
+						'metadata'
+					);
+					
+					// unset not valid keys to prevent unknown parameter stripe error
 					unset($data['customer_id']);
-					$card = $cu->cards->create($data);					
+					foreach ($data['source'] as $k => $v) {
+						if (!in_array($k, $validCardFields)) {
+							unset($data['source'][$k]);
+						}
+					}
 
-					$success = $this->fetch($card);
-					break;
-				case 'retrieveCard':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
-					$card = $cu->cards->retrieve($data['card_id']);
-
+					$card = $cu->sources->create($data);					
 					$success = $this->fetch($card);
 					
 					break;
+				case 'retrieveCard':
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
+					$card = $cu->sources->retrieve($data['card_id']);
+
+					$success = $this->fetch($card);
+					break;
 				case 'updateCard':	
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
-					$cuCard = $cu->cards->retrieve($data['card_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
+					$cuCard = $cu->sources->retrieve($data['card_id']);
 
 					foreach ($data['fields'] as $field => $value) {
 						$cuCard->$field = $value;
@@ -2019,14 +2072,14 @@ class StripeComponent extends Component {
 					$success = $this->fetch($card);
 					break;
 				case 'deleteCard':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
-					$card = $cu->cards->retrieve($data['card_id'])->delete();
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
+					$card = $cu->sources->retrieve($data['card_id'])->delete();
 					
 					$success = $this->fetch($card);
 					break;
 				case 'listCards':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
-					$cards = $cu->cards->all($data['options']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
+					$cards = $cu->sources->all($data['options']);
 					$success = $this->fetch($cards); 
 
 					foreach ($success['data'] as &$card) {
@@ -2034,7 +2087,6 @@ class StripeComponent extends Component {
 					}
 					
 					break;
-
 					
 
 				/**
@@ -2042,7 +2094,7 @@ class StripeComponent extends Component {
 				 *  	
 				 */	
 				case 'createSubscription':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
 					
 					// unset customer_id to prevent unknown parameter stripe error
 					unset($data['customer_id']);
@@ -2051,13 +2103,13 @@ class StripeComponent extends Component {
 					$success = $this->fetch($subscription);
 					break;
 				case 'retrieveSubscription':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
 					$subscription = $cu->subscriptions->retrieve($data['subscription_id']);
 
 					$success = $this->fetch($subscription);
 					break;
 				case 'updateSubscription':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
 					$cuSubscription = $cu->subscriptions->retrieve($data['subscription_id']);
 
 					foreach ($data['fields'] as $field => $value) {
@@ -2069,13 +2121,13 @@ class StripeComponent extends Component {
 					$success = $this->fetch($subscription);
 					break;
 				case 'cancelSubscription':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
-					$subscription = $cu->subscriptions->retrieve($data['subscription_id'])->cancel();
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
+					$subscription = $cu->subscriptions->retrieve($data['subscription_id'])->cancel($data['at_period_end']);
 					
 					$success = $this->fetch($subscription);
 					break;
 				case 'listSubscriptions':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
 					$subscriptions = $cu->subscriptions->all($data['options']);
 					$success = $this->fetch($subscriptions); 
 
@@ -2092,15 +2144,15 @@ class StripeComponent extends Component {
 				 *  	
 				 */	
 				case 'createPlan':
-					$plan = Stripe_Plan::create($data);
+					$plan = Stripe\Plan::create($data);
 					$success = $this->fetch($plan);
 					break;
 				case 'retrievePlan':
-					$plan = Stripe_Plan::retrieve($data['plan_id']);
+					$plan = Stripe\Plan::retrieve($data['plan_id']);
 					$success = $this->fetch($plan);
 					break;
 				case 'updatePlan':
-					$p = Stripe_Plan::retrieve($data['plan_id']);
+					$p = Stripe\Plan::retrieve($data['plan_id']);
 					
 					foreach ($data['fields'] as $field => $value) {
 						$p->$field = $value;
@@ -2110,13 +2162,13 @@ class StripeComponent extends Component {
 					$success = $this->fetch($plan);
 					break;
 				case 'deletePlan':
-					$p = Stripe_Plan::retrieve($data['plan_id']);
+					$p = Stripe\Plan::retrieve($data['plan_id']);
 					$plan = $p->delete();
 					
 					$success = $this->fetch($plan);
 					break;
 				case 'listPlans':
-					$plans = Stripe_Plan::all($data['options']);
+					$plans = Stripe\Plan::all($data['options']);
 					$success = $this->fetch($plans);
 					
 					foreach ($success['data'] as &$plan) {
@@ -2130,21 +2182,21 @@ class StripeComponent extends Component {
 				 * 	
 				 */	
 				case 'createCoupon':
-					$coupon = Stripe_Coupon::create($data);
+					$coupon = Stripe\Coupon::create($data);
 					$success = $this->fetch($coupon);
 					break;
 				case 'retrieveCoupon':
-					$coupon = Stripe_Coupon::retrieve($data['coupon_id']);
+					$coupon = Stripe\Coupon::retrieve($data['coupon_id']);
 					$success = $this->fetch($coupon);
 					break;
 				case 'deleteCoupon':
-					$c = Stripe_Coupon::retrieve($data['coupon_id']);
+					$c = Stripe\Coupon::retrieve($data['coupon_id']);
 					$coupon = $c->delete();
 						
 					$success = $this->fetch($coupon);
 					break;
 				case 'listCoupons':
-					$coupons = Stripe_Coupon::all($data['options']);
+					$coupons = Stripe\Coupon::all($data['options']);
 					$success = $this->fetch($coupons);
 						
 					foreach ($success['data'] as &$coupon) {
@@ -2158,13 +2210,13 @@ class StripeComponent extends Component {
 				 *
 				 */
 				case 'deleteCustomerDiscount':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
 					$discount = $cu->deleteDiscount();
 					
 					$success = $this->fetch($discount);
 					break;
 				case 'deleteSubscriptionDiscount':
-					$cu = Stripe_Customer::retrieve($data['customer_id']);
+					$cu = Stripe\Customer::retrieve($data['customer_id']);
 					$discount = $cu->subscriptions->retrieve($data['subscription_id'])->deleteDiscount();
 					
 					$success = $this->fetch($discount);
@@ -2177,7 +2229,7 @@ class StripeComponent extends Component {
 				 * 
 				 */
 				case 'retrieveInvoice':
-					$coupon = Stripe_Invoice::retrieve($data['invoice_id']);
+					$coupon = Stripe\Invoice::retrieve($data['invoice_id']);
 					$success = $this->fetch($coupon);
 					
 					if (!empty($success['lines']['data'])) {
@@ -2187,7 +2239,7 @@ class StripeComponent extends Component {
 					}
 					break;
 				case 'retrieveInvoiceLine':
-					$in = Stripe_Invoice::retrieve($data['invoice_id'])->lines->all($data['options']);
+					$in = Stripe\Invoice::retrieve($data['invoice_id'])->lines->all($data['options']);
 					$success = $this->fetch($in);
 					
 					if (!empty($success['data'])) {
@@ -2197,17 +2249,17 @@ class StripeComponent extends Component {
 					}
 					break;
 				case 'createInvoice':
-					$invoice = Stripe_Invoice::create($data);
+					$invoice = Stripe\Invoice::create($data);
 					$success = $this->fetch($invoice);
 					break;
 				case 'payInvoice':
-					$invoice = Stripe_Invoice::retrieve($data['invoice_id']);
+					$invoice = Stripe\Invoice::retrieve($data['invoice_id']);
 					$in = $invoice->pay();
 
 					$success = $this->fetch($in);
 					break;
 				case 'updateInvoice':
-					$in = Stripe_Invoice::retrieve($data['invoice_id']);
+					$in = Stripe\Invoice::retrieve($data['invoice_id']);
 						
 					foreach ($data['fields'] as $field => $value) {
 						$in->$field = $value;
@@ -2224,7 +2276,7 @@ class StripeComponent extends Component {
 					
 					break;
 				case 'listInvoices':
-					$invocies = Stripe_Invoice::all($data);
+					$invocies = Stripe\Invoice::all($data);
 					$success = $this->fetch($invocies);
 				
 					if (!empty($success['data'])) {
@@ -2242,7 +2294,7 @@ class StripeComponent extends Component {
 					}
 					break;
 				case 'retrieveUpcomingInvoice':
-					$invoice = Stripe_Invoice::upcoming($data);
+					$invoice = Stripe\Invoice::upcoming($data);
 					$success = $this->fetch($invoice);
 
 					if (!empty($success['lines']['data'])) {
@@ -2258,13 +2310,13 @@ class StripeComponent extends Component {
 				 *  	
 				 */	
 				case 'createInvoiceItem':
-					$success = $this->fetch(Stripe_InvoiceItem::create($data));
+					$success = $this->fetch(Stripe\InvoiceItem::create($data));
 					break;
 				case 'retrieveInvoiceItem':
-					$success = $this->fetch(Stripe_InvoiceItem::retrieve($data['invoice_item_id']));
+					$success = $this->fetch(Stripe\InvoiceItem::retrieve($data['invoice_item_id']));
 					break;
 				case 'updateInvoiceItem':
-					$ii = Stripe_InvoiceItem::retrieve($data['invoice_item_id']);
+					$ii = Stripe\InvoiceItem::retrieve($data['invoice_item_id']);
 					
 					foreach ($data['fields'] as $field => $value) {
 						$ii->$field = $value;
@@ -2273,12 +2325,12 @@ class StripeComponent extends Component {
 					$success = $this->fetch($ii->save());
 					break;
 				case 'deleteInvoiceItem':
-					$ii = Stripe_InvoiceItem::retrieve($data['invoice_item_id']);
+					$ii = Stripe\InvoiceItem::retrieve($data['invoice_item_id']);
 					
 					$success = $this->fetch($ii->delete());
 					break;
 				case 'listInvoiceItems':
-					$ii = Stripe_InvoiceItem::all($data['options']);
+					$ii = Stripe\InvoiceItem::all($data['options']);
 					$success = $this->fetch($ii);
 				
 					if (!empty($success['data'])) {
@@ -2294,11 +2346,11 @@ class StripeComponent extends Component {
 				 *  	
 				 */	
 				case 'updateDispute':
-					$ch = Stripe_Charge::retrieve($data['charge_id']);
+					$ch = Stripe\Charge::retrieve($data['charge_id']);
 					$success = $this->fetch($ch->updateDispute($data['dispute']));
 					break;
 				case 'closeDispute':
-					$ch = Stripe_Charge::retrieve($data['charge_id']);
+					$ch = Stripe\Charge::retrieve($data['charge_id']);
 					$success = $this->fetch($ch->closeDispute());
 					break;
 
@@ -2309,14 +2361,14 @@ class StripeComponent extends Component {
 				 *  
 				 */	
 				case 'createTransfer':
-					$success = $this->fetch(Stripe_Transfer::create($data));
+					$success = $this->fetch(Stripe\Transfer::create($data));
 
 					break;
 				case 'retrieveTransfer':
-					$success = $this->fetch(Stripe_Transfer::retrieve($data['transfer_id']));
+					$success = $this->fetch(Stripe\Transfer::retrieve($data['transfer_id']));
 					break;
 				case 'updateTransfer':
-					$tr = Stripe_Transfer::retrieve($data['transfer_id']);
+					$tr = Stripe\Transfer::retrieve($data['transfer_id']);
 					
 					foreach ($data['fields'] as $field => $value) {
 						$tr->$field = $value;
@@ -2325,11 +2377,11 @@ class StripeComponent extends Component {
 					$success = $this->fetch($tr->save());
 					break;
 				case 'cancelTransfer':
-					$tr = Stripe_Transfer::retrieve($data['transfer_id']);
+					$tr = Stripe\Transfer::retrieve($data['transfer_id']);
 					$success = $this->fetch($tr->cancel());
 					break;
 				case 'listTransfers':
-					$tr = Stripe_Transfer::all($data['options']);
+					$tr = Stripe\Transfer::all($data['options']);
 					$success = $this->fetch($tr);
 
 					foreach ($success['data'] as &$transfer) {
@@ -2385,7 +2437,7 @@ class StripeComponent extends Component {
 				 *  
 				 */	
 				case 'createRecipient':
-					$recipient = Stripe_Recipient::create($data);
+					$recipient = Stripe\Recipient::create($data);
 					$success = $this->fetch($recipient);
 						
 					if (!empty($success['cards']['data'])) {
@@ -2397,7 +2449,7 @@ class StripeComponent extends Component {
 				
 					break;
 				case 'retrieveRecipient':
-					$recipient = Stripe_Recipient::retrieve($data['recipient_id']);
+					$recipient = Stripe\Recipient::retrieve($data['recipient_id']);
 					$success = $this->fetch($recipient);
 						
 					if (!empty($success['cards']['data'])) {
@@ -2409,7 +2461,7 @@ class StripeComponent extends Component {
 						
 					break;
 				case 'updateRecipient':
-					$rp = Stripe_Recipient::retrieve($data['recipient_id']);
+					$rp = Stripe\Recipient::retrieve($data['recipient_id']);
 						
 					foreach ($data['fields'] as $field => $value) {
 						$rp->$field = $value;
@@ -2426,12 +2478,12 @@ class StripeComponent extends Component {
 						
 					break;
 				case 'deleteRecipient':
-					$rp = Stripe_Recipient::retrieve($data['recipient_id']);
+					$rp = Stripe\Recipient::retrieve($data['recipient_id']);
 					$success = $this->fetch($rp->delete());
 						
 					break;
 				case 'listRecipients':
-					$recipients = Stripe_Recipient::all($data['options']);
+					$recipients = Stripe\Recipient::all($data['options']);
 					$success = $this->fetch($recipients);
 						
 					foreach ($success['data'] as &$recipient) {
@@ -2454,7 +2506,7 @@ class StripeComponent extends Component {
 				 *  	
 				 */	
 				case 'retrieveApplicationFee':
-					$success = $this->fetch(Stripe_ApplicationFee::retrieve($data['application_fee_id']));
+					$success = $this->fetch(Stripe\ApplicationFee::retrieve($data['application_fee_id']));
 					
 					if (!empty($success['refunds'])) {
 						foreach ($success['refunds'] as &$refund) {
@@ -2464,7 +2516,7 @@ class StripeComponent extends Component {
 						
 					break;
 				case 'refundApplicationFee':
-					$fee = Stripe_ApplicationFee::retrieve($data['application_fee_id']);
+					$fee = Stripe\ApplicationFee::retrieve($data['application_fee_id']);
 
 					unset($data['application_fee_id']);
 					$success = $this->fetch($fee->refund($data));
@@ -2477,7 +2529,7 @@ class StripeComponent extends Component {
 
 					break;
 				case 'listApplicationFees':
-					$fees = Stripe_ApplicationFee::all($data['options']);
+					$fees = Stripe\ApplicationFee::all($data['options']);
 					$success = $this->fetch($fees);
 				
 					foreach ($success['data'] as &$fee) {
@@ -2492,7 +2544,7 @@ class StripeComponent extends Component {
 				 *  	
 				 */	
 				case 'retrieveAccount':
-					$success = $this->fetch(Stripe_Account::retrieve());
+					$success = $this->fetch(Stripe\Account::retrieve());
 					break;
 
 					
@@ -2504,13 +2556,13 @@ class StripeComponent extends Component {
 				 */	
 					
 				case 'retrieveBalance':
-					$success = $this->fetch(Stripe_Balance::retrieve());
+					$success = $this->fetch(Stripe\Balance::retrieve());
 					break;
 				case 'retrieveBalanceTransaction':
-					$success = $this->fetch(Stripe_BalanceTransaction::retrieve($data['transaction_id']));
+					$success = $this->fetch(Stripe\BalanceTransaction::retrieve($data['transaction_id']));
 					break;
 				case 'listBalanceHistory':
-					$history = Stripe_BalanceTransaction::all($data['options']);
+					$history = Stripe\BalanceTransaction::all($data['options']);
 					$success = $this->fetch($history);
 				
 					foreach ($success['data'] as &$transaction) {
@@ -2528,7 +2580,7 @@ class StripeComponent extends Component {
 				 */	
 					
 				case 'retrieveEvent':
-					$event = Stripe_Event::retrieve($data['event_id']);
+					$event = Stripe\Event::retrieve($data['event_id']);
 					$success = $this->fetch($event);
 					
 					// cards
@@ -2541,7 +2593,7 @@ class StripeComponent extends Component {
 					
 					break;
 				case 'listEvents':
-					$events = Stripe_Event::all($data['options']);
+					$events = Stripe\Event::all($data['options']);
 					$success = $this->fetch($events);
 
 					foreach ($success['data'] as &$event) {
@@ -2573,13 +2625,13 @@ class StripeComponent extends Component {
 				 *  	
 				 */	
 				case 'createCardToken':
-					$success = $this->fetch(Stripe_Token::create($data));
+					$success = $this->fetch(Stripe\Token::create($data));
 					break;
 				case 'createBankAccountToken':
-					$success = $this->fetch(Stripe_Token::create($data));
+					$success = $this->fetch(Stripe\Token::create($data));
 					break;
 				case 'retrieveToken':
-					$success = $this->fetch(Stripe_Token::retrieve($data['token_id']));
+					$success = $this->fetch(Stripe\Token::retrieve($data['token_id']));
 					break;
 					
 				default:
@@ -2587,37 +2639,33 @@ class StripeComponent extends Component {
 					break;
 			}
 
-		} catch(Stripe_CardError $e) {
+		} catch(Stripe\Error\Card $e) {
 			$body = $e->getJsonBody();
 			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
-			
+
 			$message = $error['message'];
-		} catch (Stripe_InvalidRequestError $e) {
+		} catch (Stripe\Error\InvalidRequest $e) {
 			$body = $e->getJsonBody();
 			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
-		} catch (Stripe_AuthenticationError $e) {
-			$body = $e->getJsonBody();
-			$error = $body['error'];
+		} catch (Stripe\Error\Authentication $e) {
+			$error = $e->getJsonBody();
 			$error['http_status'] = $e->getHttpStatus();
-		} catch (Stripe_ApiConnectionError $e) {
+		} catch (Stripe\Error\ApiConnection $e) {
 			$body = $e->getJsonBody();
-			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
-		} catch (Stripe_Error $e) {
+		} catch (Stripe\Error\Base $e) {
 			$body = $e->getJsonBody();
-			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
 		} catch (Exception $e) {
 			$body = $e->getJsonBody();
-			$error = $body['error'];
 			$error['http_status'] = $e->getHttpStatus();
 		}
 		
 		if ($success) {
 			if ($this->logFile && in_array($this->logType, array('both', 'success'))) {
-				CakeLog::write('success', $method, $this->logFile);
+				CakeLog::write('Success', $method, $this->logFile);
 			}
 			
 			return array(
@@ -2629,7 +2677,7 @@ class StripeComponent extends Component {
 
 		$str = $method.", type:".@$error['type'].", http_status:".@$error['http_status'].", param:".@$error['param'].", message:".@$error['message'];
 		if ($this->logFile && in_array($this->logType, array('both', 'error'))) {
-			CakeLog::error( $str, $this->logFile );
+			CakeLog::write('Error', $str, $this->logFile );
 		}
 	
 		return array(
